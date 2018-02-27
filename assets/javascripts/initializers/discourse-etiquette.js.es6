@@ -1,60 +1,27 @@
 import { withPluginApi } from 'discourse/lib/plugin-api';
-import { ajax } from 'discourse/lib/ajax';
+import Composer from 'discourse/models/composer';
 
 function initialize(api) {
-  api.modifyClass('controller:composer', {
-    _etiquette_checked: null,
+  api.modifyClass('model:composer', {
+    etiquette_ignored: false,
 
-    etiquetteSave(force) {
-      this.set('_etiquette_checked', true);
-      this.save(force).finally(() => {
-        this.set('_etiquette_checked', false);
-      });
-    },
-
-    save(force) {
-      // same validataion code from controller
-      if (this.get("disableSubmit")) return;
-      if (!this.get('showWarning')) {
-        this.set('model.isWarning', false);
-      }
-      const composer = this.get('model');
-      if (composer.get('cantSubmitPost')) {
-        this.set('lastValidatedAt', Date.now());
-        return;
-      }
-
-      if (!this.get('_etiquette_checked')) {
-        var concat = '';
-        ['title', 'raw', 'reply'].forEach((item, _) => {
-          const content = composer.get(item);
-          if (content) {
-            concat += `${content} `;
-          }
-        });
-        concat.trim();
-        ajax(`/etiquette/post_toxicity?concat=${concat}`).then(response => {
-          if (response && response['score'] !== undefined) {
-            const message = I18n.t("etiquette.etiquette_message");
-
-            let buttons = [{
-              "label": I18n.t("etiquette.composer_continue"),
-              "class": "btn",
-              callback: () => this.etiquetteSave(force)
-            }, {
-              "label": I18n.t("etiquette.composer_edit"),
-              "class": "btn-primary"
-            }];
-            bootbox.dialog(message, buttons);
-            return;
+    save(opts) {
+      const result = this._super(opts);
+      if (result) {
+        return result.catch(error => {
+          this.set('etiquette_ignored', true);
+          if (error.startsWith("Etiquette check fails")) {
+            throw "It looks like what you're about to post might be considered rude or disrespectful to others, and may be flagged for review. If you still want to continue posting, please try again."
           } else {
-            this.etiquetteSave(force);
+            throw error;
           }
-        }).catch(() => { // fail silently
-          this.etiquetteSave(force);
+        }).then(result => {
+          // reset flag
+          if (this.get('etiquette_ignored')) {
+            this.set('etiquette_ignored', false);
+          }
+          return result;
         });
-      } else {
-        return this._super(force);
       }
     }
   });
@@ -67,6 +34,8 @@ export default {
     const siteSettings = container.lookup('site-settings:main');
     if (siteSettings.etiquette_enabled) {
       withPluginApi('0.8.17', initialize);
+      Composer.serializeOnCreate('etiquette_ignored');
+      Composer.serializeToTopic('etiquette_ignored', 'etiquette_ignored');
     }
   }
 }

@@ -1,6 +1,6 @@
 # name: discourse-etiquette
 # about: Mark uncivil posts by Google's Perspective API
-# version: 1.1
+# version: 1.2
 # authors: Erick Guan
 # url: https://github.com/fantasticfears/discourse-etiquette
 
@@ -24,6 +24,33 @@ after_initialize do
   # register_post_custom_field_type(DiscourseEtiquette::POST_CUSTOM_FIELD_NAME, :json)
 
   require_dependency "application_controller"
+
+  PostsController.class_eval do
+    prepend(EtiqutteExtension = Module.new do
+      def create
+        if !is_api? && SiteSetting.etiquette_enabled
+          hijack do
+            begin
+              if params[:etiquette_ignored] == "false" && (scores = check_content("#{params[:raw]} #{params[:title]}".strip))
+                render_json_error "Etiquette check fails: #{scores[:score]}", type: :etiquette_check, status: 403
+              else
+                super
+              end
+            rescue => e
+              render json: { "errors": [e.full_message] }, status: 504
+            end
+          end
+          return
+        end
+
+        super
+      end
+
+      def check_content(content)
+        content&.present? && DiscourseEtiquette.check_content_toxicity(content, current_user)
+      end
+    end)
+  end
 
   module ::Etiquette
     class PostToxicityController < ::ApplicationController
