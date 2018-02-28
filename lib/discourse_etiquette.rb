@@ -34,6 +34,16 @@ module DiscourseEtiquette
       read_timeout: 5,
       write_timeout: 10,
       ssl_verify_peer: true,
+      retry_limit: 2
+    }
+  end
+
+  def self.background_request_options
+    @background_request_options ||= {
+      connect_timeout: 1,
+      read_timeout: 1,
+      write_timeout: 1,
+      ssl_verify_peer: true,
       retry_limit: 0
     }
   end
@@ -77,20 +87,19 @@ module DiscourseEtiquette
   RawContent = Struct.new(:raw, :user_id)
   def self.check_content_toxicity(content, user_id)
     post = RawContent.new(content, user_id)
-    response = self.request_analyze_comment(post)
+    response = self.request_analyze_comment(post, self.proxy_request_options)
     score = self.extract_value_from_analyze_comment_response(response.body)
     if score[:score] > SiteSetting.etiquette_notify_posting_min_toxicity_confidence
       score
     end
   end
 
-  def self.request_analyze_comment(post)
+  def self.request_analyze_comment(post, request_options = self.background_request_options)
     analyze_comment = AnalyzeComment.new(post, post.user_id)
 
     @conn ||= Excon.new(
       "#{ANALYZE_COMMENT_ENDPOINT}?key=#{SiteSetting.etiquette_google_api_key}",
-      self.proxy_request_options
-    )
+      request_options)
 
     body = analyze_comment.to_json
     headers = {

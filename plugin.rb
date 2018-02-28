@@ -32,18 +32,15 @@ after_initialize do
           hijack do
             begin
               if params[:etiquette_ignored] == "false" && (scores = check_content("#{params[:raw]} #{params[:title]}".strip))
-                render_json_error "Etiquette check fails: #{scores[:score]}", type: :etiquette_check, status: 403
+                render_json_error "Etiquette check fails: #{scores[:score]}", type: :etiquette_check, status: 403 rescue super
               else
                 super
               end
-            rescue => e
-              render json: { "errors": [e.full_message] }, status: 504
             end
           end
-          return
+        else
+          super
         end
-
-        super
       end
 
       def check_content(content)
