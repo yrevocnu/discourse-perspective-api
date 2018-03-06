@@ -31,11 +31,17 @@ after_initialize do
         if !is_api? && SiteSetting.etiquette_enabled
           hijack do
             begin
-              if params[:etiquette_ignored] == "false" && (scores = check_content("#{params[:raw]} #{params[:title]}".strip))
-                render_json_error "Etiquette check fails: #{scores[:score]}", type: :etiquette_check, status: 403 rescue super
+              if params[:etiquette_ignored] != "true"
+                RateLimiter.new(current_user, "post-toxicity", 6, 1.minute).performed!
+                scores = check_content("#{params[:raw]} #{params[:title]}".strip)
+                render_json_error "[Etiquette] high confidence with toxic content: #{scores[:score]}", type: :etiquette_check, status: 403
               else
                 super
               end
+            rescue RateLimiter::LimitExceeded => e
+              super
+            rescue
+              super
             end
           end
         else
