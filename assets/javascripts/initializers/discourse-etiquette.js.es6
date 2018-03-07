@@ -2,6 +2,7 @@ import { withPluginApi } from 'discourse/lib/plugin-api';
 import Composer from 'discourse/models/composer';
 import { on, observes } from 'ember-addons/ember-computed-decorators';
 import { renderSpinner } from 'discourse/helpers/loading-spinner';
+import DiscourseURL from 'discourse/lib/url';
 
 function initialize(api) {
   api.modifyClass('controller:composer', {
@@ -140,6 +141,7 @@ function initialize(api) {
     },
 
     _cacthErrorOnSave(error) {
+      console.log(this);
       const composer = this.get('model');
       composer.set('disableDrafts', false);
       composer.set('etiquette_ignored', true);
