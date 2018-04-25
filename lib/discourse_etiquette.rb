@@ -72,8 +72,9 @@ module DiscourseEtiquette
 
   def self.backfill_post_etiquette_check(post)
     response = self.request_analyze_comment(post)
-    post.custom_fields[POST_ANALYSIS_FIELD] = response.body
+    post.custom_fields[POST_ANALYSIS_FIELD] = MultiJson.dump(MultiJson.load(response.body))
     post.custom_fields[POST_ANALYSIS_DATATIME_FIELD] = DateTime.now
+    post.save!
   end
 
   def self.check_post_toxicity(post)
@@ -119,7 +120,7 @@ module DiscourseEtiquette
     return false if post.blank? || (!SiteSetting.etiquette_enabled?)
 
     # admin can choose whether to flag private messages. The message will be sent to moderators.
-    return false if !SiteSetting.etiquette_check_private_message && post.topic.private_message?
+    return false if !SiteSetting.etiquette_check_private_message && post&.topic&.private_message?
 
     stripped = post.raw.strip
 
