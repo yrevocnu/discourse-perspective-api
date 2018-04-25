@@ -1,5 +1,8 @@
 module DiscourseEtiquette
   ANALYZE_COMMENT_ENDPOINT = 'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze'
+  POST_ANALYSIS_FIELD = 'post_etiquette'
+  POST_ANALYSIS_DATATIME_FIELD = 'etiquette_checked'
+
   class NetworkError < StandardError; end
 
   class AnalyzeComment
@@ -30,9 +33,9 @@ module DiscourseEtiquette
 
   def self.proxy_request_options
     @proxy_request_options ||= {
-      connect_timeout: 5, # in seconds
-      read_timeout: 5,
-      write_timeout: 10,
+      connect_timeout: 1, # in seconds
+      read_timeout: 3,
+      write_timeout: 3,
       ssl_verify_peer: true,
       retry_limit: 0
     }
@@ -65,6 +68,12 @@ module DiscourseEtiquette
         message: I18n.t('etiquette_flag_message')
       )
     end
+  end
+
+  def self.backfill_post_etiquette_check(post)
+    response = self.request_analyze_comment(post)
+    post.custom_fields[POST_ANALYSIS_FIELD] = response.body
+    post.custom_fields[POST_ANALYSIS_DATATIME_FIELD] = DateTime.now
   end
 
   def self.check_post_toxicity(post)
