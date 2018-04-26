@@ -22,8 +22,7 @@ after_initialize do
     end
   end
 
-  register_post_custom_field_type(DiscourseEtiquette::POST_ANALYSIS_FIELD, :json)
-  register_post_custom_field_type(DiscourseEtiquette::POST_ANALYSIS_DATATIME_FIELD, 'string')
+  register_post_custom_field_type(DiscourseEtiquette.post_score_field_name, :float)
 
   require_dependency "application_controller"
 

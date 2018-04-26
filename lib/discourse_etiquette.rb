@@ -90,7 +90,7 @@ module DiscourseEtiquette
   def self.backfill_post_etiquette_check(post)
     response = self.request_analyze_comment(post)
     score = self.extract_value_from_analyze_comment_response(response.body)
-    post.custom_fields[self.post_score_field_name] = score[:score]
+    post.custom_fields[self.post_score_field_name] = score[:score].to_f
     post.save_custom_fields(true)
   end
 
