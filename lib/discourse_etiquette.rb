@@ -104,7 +104,7 @@ module DiscourseEtiquette
   end
 
   def self.request_analyze_comment(post)
-    analyze_comment = AnalyzeComment.new(post, post.user_id)
+    analyze_comment = AnalyzeComment.new(post, post&.user_id)
 
     @conn ||= Excon.new(GOOGLE_API_DOMAIN, self.proxy_request_options)
 
