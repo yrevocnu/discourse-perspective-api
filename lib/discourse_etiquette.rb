@@ -1,5 +1,6 @@
 module DiscourseEtiquette
-  ANALYZE_COMMENT_ENDPOINT = 'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze'
+  ANALYZE_COMMENT_ENDPOINT = '/v1alpha1/comments:analyze'
+  GOOGLE_API_DOMAIN = 'https://commentanalyzer.googleapis.com'
   POST_ANALYSIS_FIELD = 'post_etiquette'
   POST_ANALYSIS_DATATIME_FIELD = 'etiquette_checked'
 
@@ -37,7 +38,8 @@ module DiscourseEtiquette
       read_timeout: 3,
       write_timeout: 3,
       ssl_verify_peer: true,
-      retry_limit: 0
+      retry_limit: 0,
+      persistent: true
     }
   end
 
@@ -97,10 +99,7 @@ module DiscourseEtiquette
   def self.request_analyze_comment(post)
     analyze_comment = AnalyzeComment.new(post, post.user_id)
 
-    @conn ||= Excon.new(
-      "#{ANALYZE_COMMENT_ENDPOINT}?key=#{SiteSetting.etiquette_google_api_key}",
-      self.proxy_request_options
-    )
+    @conn ||= Excon.new(GOOGLE_API_DOMAIN, self.proxy_request_options)
 
     body = analyze_comment.to_json
     headers = {
@@ -110,7 +109,11 @@ module DiscourseEtiquette
       'User-Agent' => "Discourse/#{Discourse::VERSION::STRING}",
     }
     begin
-      @conn.post(headers: headers, body: body, persistent: true)
+          #     @option params [String] :path appears after 'scheme://host:port/'
+    #     @option params [Hash]   :query appended to the 'scheme://host:port/path/' in the form of '?key=value'
+    def request(params={}, &block)
+
+      @conn.request(method: :post, path: ANALYZE_COMMENT_ENDPOINT, query: { key: SiteSetting.etiquette_google_api_key }, headers: headers, body: body)
     rescue
       raise NetworkError, "Excon had some problems with Google's Perspective API."
     end

@@ -16,6 +16,7 @@ module Jobs
     end
 
     def last_checked_post_id=(val)
+      store.set(LAST_CHECKED_TIME_KEY, DateTime.now)
       store.set(LAST_CHECKED_POST_ID_KEY, val)
     end
 
@@ -77,6 +78,7 @@ module Jobs
       Post.order(id: :asc).includes(:topic).offset(last_checked_post_id).limit(batch_size).find_each do |p|
         p "checking #{p.id}"
         queued.add(p.id)
+        last_id = p.id
         if DiscourseEtiquette.should_check_post?(p)
           begin
             DiscourseEtiquette.backfill_post_etiquette_check(p)
@@ -85,7 +87,6 @@ module Jobs
             next
           end
         end
-        last_id = p.id
       end
 
       last_checked_post_id = last_id
