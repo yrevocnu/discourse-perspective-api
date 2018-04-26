@@ -109,10 +109,6 @@ module DiscourseEtiquette
       'User-Agent' => "Discourse/#{Discourse::VERSION::STRING}",
     }
     begin
-          #     @option params [String] :path appears after 'scheme://host:port/'
-    #     @option params [Hash]   :query appended to the 'scheme://host:port/path/' in the form of '?key=value'
-    def request(params={}, &block)
-
       @conn.request(method: :post, path: ANALYZE_COMMENT_ENDPOINT, query: { key: SiteSetting.etiquette_google_api_key }, headers: headers, body: body)
     rescue
       raise NetworkError, "Excon had some problems with Google's Perspective API."
