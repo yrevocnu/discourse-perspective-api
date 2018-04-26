@@ -18,7 +18,7 @@ module Jobs
     def set_last_checked_post_id(val)
       val = val.to_i
       store.set(LAST_CHECKED_TIME_KEY, DateTime.now)
-      store.set(LAST_CHECKED_POST_ID_KEY, val)
+      p store.set(LAST_CHECKED_POST_ID_KEY, val)
       @last_checked_post_id = val
     end
 
@@ -55,29 +55,31 @@ module Jobs
         queued = Set.new(queued_post)
         checked = Set.new
 
-        queued_post.each do |p|
-          p "checking failed #{p}"
-          p = Post.includes(:topic).find_by(id: p)
-          if p.nil?
-            checked.add(p.id)
+        queued_post.each do |post_id|
+          p "checking failed #{post_id}"
+          post = Post.includes(:topic).find_by(id: post_id)
+          if post.nil?
+            checked.add(post_id)
             next
           end
+          p post, post.nil?
 
-          if DiscourseEtiquette.should_check_post?(p)
+          if DiscourseEtiquette.should_check_post?(post)
             begin
-              DiscourseEtiquette.backfill_post_etiquette_check(p)
-              checked.add(p.id)
-            rescue e
-              print(e)
+              DiscourseEtiquette.backfill_post_etiquette_check(post)
+              checked.add(post.id)
+            rescue => error
+              Rails.logger.warn(error)
               next
             end
           else
-            checked.add(p.id)
+            checked.add(post.id)
           end
         end
 
         success_checks = checked.size
-        store.set(FAILED_POST_ID_KEY, (Set.new(failed_post_ids[batch_size..-1]) + queued - checked).to_a)
+        p (Set.new(failed_post_ids[batch_size..-1]) + queued - checked).to_a
+        p store.set(FAILED_POST_ID_KEY, (Set.new(failed_post_ids[batch_size..-1]) + queued - checked).to_a)
       end
 
       return batch_size - success_checks
