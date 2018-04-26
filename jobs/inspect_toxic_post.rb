@@ -72,7 +72,7 @@ module Jobs
       set_last_checked_post_id(last_id)
       failed_post_ids = (queued - checked)
       unless failed_post_ids.empty?
-        failed_post_ids = failed_post_ids + Set.new(previous_failed_post_ids)
+        failed_post_ids = failed_post_ids + Set.new(store.get(FAILED_POST_ID_KEY))
         store.set(FAILED_POST_ID_KEY, failed_post_ids.to_a)
       end
 
