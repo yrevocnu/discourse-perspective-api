@@ -106,7 +106,7 @@ module Jobs
     end
 
     def can_start_next_iteration?(last_id)
-      last_checked_post_timestamp + SiteSetting.etiquette_historical_inspection_period > DateTime.now &&
+      DateTime.now >= last_checked_post_timestamp + SiteSetting.etiquette_historical_inspection_period &&
         last_id >= Post.order(id: :asc).pluck(:id).last
     end
 
