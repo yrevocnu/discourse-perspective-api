@@ -50,6 +50,7 @@ module Jobs
       failed_post_ids = previous_failed_post_ids
 
       queued_post = failed_post_ids[0...batch_size]
+      p "Queued_post: #{queued_post}"
       unless queued_post.empty?
         queued_post.each do |post_id|
           p "checking failed #{post_id}"
@@ -67,7 +68,7 @@ module Jobs
           end
         end
       end
-      puts "Updating failed list"
+      puts "Updating failed list: #{failed_post_ids[batch_size..-1].to_a}"
       p store.set(FAILED_POST_ID_KEY, failed_post_ids[batch_size..-1].to_a)
 
       return batch_size - queued_post.size
