@@ -50,19 +50,12 @@ module Jobs
       failed_post_ids = previous_failed_post_ids
 
       queued_post = failed_post_ids[0...batch_size]
-      success_checks = 0
       unless queued_post.empty?
-        queued = Set.new(queued_post)
-        checked = Set.new
-
         queued_post.each do |post_id|
           p "checking failed #{post_id}"
-          post = Post.includes(:topic).find_by(id: post_id)
-          if post.nil?
-            checked.add(post_id)
-            next
-          end
-          p post, post.nil?
+          post = Post.with_deleted.includes(:topic).find_by(id: post_id)
+          next unless post
+          puts "#{post_id} proceed passed the next?" if post.nil?
 
           if DiscourseEtiquette.should_check_post?(post)
             begin
@@ -72,17 +65,13 @@ module Jobs
               Rails.logger.warn(error)
               next
             end
-          else
-            checked.add(post.id)
           end
         end
-
-        success_checks = checked.size
-        p (Set.new(failed_post_ids[batch_size..-1]) + queued - checked).to_a
-        p store.set(FAILED_POST_ID_KEY, (Set.new(failed_post_ids[batch_size..-1]) + queued - checked).to_a)
       end
+      puts "Updating failed list"
+      p store.set(FAILED_POST_ID_KEY, failed_post_ids[batch_size..-1])
 
-      return batch_size - success_checks
+      return batch_size - queued_post.size
     end
 
     def check_posts(batch_size)
@@ -104,8 +93,7 @@ module Jobs
         end
       end
 
-      p "Last ID #{last_id}"
-      p last_checked_post_id
+      p "Setting last ID #{last_id}"
       set_last_checked_post_id(last_id)
       p last_checked_post_id
       failed_post_ids = (queued - checked)
