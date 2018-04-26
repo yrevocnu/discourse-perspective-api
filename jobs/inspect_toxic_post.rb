@@ -6,33 +6,34 @@ module Jobs
     LAST_CHECKED_POST_ID_KEY = 'last_checked_post_id'
     LAST_CHECKED_TIME_KEY = 'last_checked_iteration_timestamp'
     FAILED_POST_ID_KEY = 'failed_post_ids'
-    PLUGIN_STORE_NAME = 'discourse-etiquette'
 
     def store
-      @store ||= PluginStore.new(PLUGIN_STORE_NAME)
+      @store ||= PluginStore.new('discourse-etiquette')
     end
 
     def last_checked_post_id
-      store.get(LAST_CHECKED_POST_ID_KEY)&.to_i || 0
+      @last_checked_post_id ||= store.get(LAST_CHECKED_POST_ID_KEY)&.to_i || 0
     end
 
     def set_last_checked_post_id(val)
       val = val.to_i
       store.set(LAST_CHECKED_TIME_KEY, DateTime.now)
       p store.set(LAST_CHECKED_POST_ID_KEY, val)
+      @last_checked_post_id = val
     end
 
     def last_checked_post_timestamp
-      store.get(LAST_CHECKED_TIME_KEY)&.to_datetime || 100.years.ago
+      @last_checked_post_timestamp ||= store.get(LAST_CHECKED_TIME_KEY)&.to_datetime || 100.years.ago
     end
 
     def previous_failed_post_ids
-      store.get(FAILED_POST_ID_KEY) || []
+      @previous_failed_post_ids ||= store.get(FAILED_POST_ID_KEY) || []
     end
 
     def set_previous_failed_post_ids(val)
       list = val.to_a
       store.set(FAILED_POST_ID_KEY, list)
+      @previous_failed_post_ids = list
     end
 
     def execute(args)
