@@ -60,7 +60,6 @@ module Jobs
           if DiscourseEtiquette.should_check_post?(post)
             begin
               DiscourseEtiquette.backfill_post_etiquette_check(post)
-              checked.add(post.id)
             rescue => error
               Rails.logger.warn(error)
               next
@@ -69,7 +68,7 @@ module Jobs
         end
       end
       puts "Updating failed list"
-      p store.set(FAILED_POST_ID_KEY, failed_post_ids[batch_size..-1])
+      p store.set(FAILED_POST_ID_KEY, failed_post_ids[batch_size..-1].to_a)
 
       return batch_size - queued_post.size
     end
@@ -87,7 +86,8 @@ module Jobs
           begin
             DiscourseEtiquette.backfill_post_etiquette_check(p)
             checked.add(p.id)
-          rescue
+          rescue => error
+            Rails.logger.info(error)
             next
           end
         end
