@@ -12,16 +12,28 @@ module Jobs
     end
 
     def last_checked_post_id
-      store.get(LAST_CHECKED_POST_ID_KEY)&.to_i
+      @last_checked_post_id ||= store.get(LAST_CHECKED_POST_ID_KEY)&.to_i || 0
     end
 
-    def last_checked_post_id=(val)
+    def set_last_checked_post_id(val)
+      val = val.to_i
       store.set(LAST_CHECKED_TIME_KEY, DateTime.now)
       store.set(LAST_CHECKED_POST_ID_KEY, val)
+      @last_checked_post_id = val
     end
 
     def last_checked_post_timestamp
-      store.get(LAST_CHECKED_TIME_KEY)&.to_datetime || 100.years.ago
+      @last_checked_post_timestamp ||= store.get(LAST_CHECKED_TIME_KEY)&.to_datetime || 100.years.ago
+    end
+
+    def previous_failed_post_ids
+      @previous_failed_post_ids ||= store.get(FAILED_POST_ID_KEY) || []
+    end
+
+    def set_previous_failed_post_ids(val)
+      list = val.to_a
+      store.set(FAILED_POST_ID_KEY, list)
+      @previous_failed_post_ids = list
     end
 
     def execute(args)
@@ -35,7 +47,7 @@ module Jobs
 
     def retry_failed_checks(batch_size)
       return if batch_size <= 0
-      failed_post_ids = (store.get(FAILED_POST_ID_KEY) || [])
+      failed_post_ids = previous_failed_post_ids
 
       queued_post = failed_post_ids[0...batch_size]
       success_checks = 0
@@ -45,7 +57,7 @@ module Jobs
 
         queued_post.each do |p|
           p "checking failed #{p}"
-          p = Post.find_by(id: p)
+          p = Post.includes(:topic).find_by(id: p)
           if p.nil?
             checked.add(p.id)
             next
@@ -55,7 +67,8 @@ module Jobs
             begin
               DiscourseEtiquette.backfill_post_etiquette_check(p)
               checked.add(p.id)
-            rescue
+            rescue e
+              print(e)
               next
             end
           else
@@ -75,7 +88,7 @@ module Jobs
       queued = Set.new
       checked = Set.new
       last_id = last_checked_post_id
-      Post.order(id: :asc).includes(:topic).offset(last_checked_post_id).limit(batch_size).find_each do |p|
+      Post.with_deleted.order(id: :asc).includes(:topic).offset(last_checked_post_id).limit(batch_size).find_each do |p|
         p "checking #{p.id}"
         queued.add(p.id)
         last_id = p.id
@@ -89,22 +102,26 @@ module Jobs
         end
       end
 
-      last_checked_post_id = last_id
+      p "Last ID #{last_id}"
+      p last_checked_post_id
+      set_last_checked_post_id(last_id)
+      p last_checked_post_id
       failed_post_ids = (queued - checked)
       unless failed_post_ids.empty?
-        failed_post_ids = failed_post_ids + Set.new(store.get(FAILED_POST_ID_KEY))
-        store.set(FAILED_POST_ID_KEY, failed_post_ids.to_a)
+        failed_post_ids = failed_post_ids + Set.new(previous_failed_post_ids)
+        set_previous_failed_post_ids(failed_post_ids)
       end
 
-      try_start_new_iteration if finish_last_iteration?(last_checked_post_id)
+      start_new_iteration if can_start_next_iteration?(last_id)
     end
 
-    def finish_last_iteration?(last_checked_post_id)
-      if last_checked_post_timestamp + SiteSetting.etiquette_historical_inspection_period > DateTime.now &&
-          last_checked_post_id >= Post.order(id: :asc).pluck(:id).last
-        last_checked_post_timestamp = DateTime.now
-        last_checked_post_id = 0
-      end
+    def can_start_next_iteration?(last_id)
+      last_checked_post_timestamp + SiteSetting.etiquette_historical_inspection_period > DateTime.now &&
+        last_id >= Post.order(id: :asc).pluck(:id).last
+    end
+
+    def start_new_iteration
+      set_last_checked_post_id(0)
     end
   end
 end

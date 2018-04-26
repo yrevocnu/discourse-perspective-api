@@ -13,9 +13,16 @@ module DiscourseEtiquette
     end
 
     def to_json
+      # This is a hard limit from Google API. (3000 bytes)
+      # Truncate naively here. Some long posts are PM and from Discourse.
+      # https://github.com/conversationai/perspectiveapi/blob/master/api_reference.md#scoring-comments-analyzecomment
+      raw = @post.raw[0..3000]
+      while raw.bytesize > 3000
+        raw = raw[0..-5]
+      end
       payload = {
         comment: {
-          text: @post.raw
+          text: raw
         },
         doNotStore: true,
         sessionId: "#{Discourse.base_url}_#{@user_id}"
@@ -76,7 +83,7 @@ module DiscourseEtiquette
     response = self.request_analyze_comment(post)
     post.custom_fields[POST_ANALYSIS_FIELD] = MultiJson.dump(MultiJson.load(response.body))
     post.custom_fields[POST_ANALYSIS_DATATIME_FIELD] = DateTime.now
-    post.save!
+    post.save_custom_fields(true)
   end
 
   def self.check_post_toxicity(post)
