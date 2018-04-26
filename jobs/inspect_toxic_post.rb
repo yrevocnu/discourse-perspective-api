@@ -33,7 +33,6 @@ module Jobs
         queued_post.each do |post_id|
           post = Post.with_deleted.includes(:topic).find_by(id: post_id)
           next unless post
-          puts "#{post_id} proceed passed the next?" if post.nil?
 
           if DiscourseEtiquette.should_check_post?(post)
             begin
@@ -45,7 +44,6 @@ module Jobs
           end
         end
       end
-      puts "Updating failed list: #{failed_post_ids[batch_size..-1].to_a}"
       store.set(FAILED_POST_ID_KEY, failed_post_ids[batch_size..-1].to_a)
 
       return batch_size - queued_post.size

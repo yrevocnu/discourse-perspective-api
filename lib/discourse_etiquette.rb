@@ -1,8 +1,7 @@
 module DiscourseEtiquette
   ANALYZE_COMMENT_ENDPOINT = '/v1alpha1/comments:analyze'
   GOOGLE_API_DOMAIN = 'https://commentanalyzer.googleapis.com'
-  POST_ANALYSIS_FIELD = 'post_etiquette'
-  POST_ANALYSIS_DATATIME_FIELD = 'etiquette_checked'
+  POST_ANALYSIS_FIELD_PREFIX = 'post_etiquette'
 
   class NetworkError < StandardError; end
 
@@ -79,10 +78,19 @@ module DiscourseEtiquette
     end
   end
 
+  def self.post_score_field_name
+    case SiteSetting.etiquette_toxicity_model
+    when 'standard'
+      "#{POST_ANALYSIS_FIELD_PREFIX}_toxicity"
+    when 'severe toxicity (experimental)'
+      "#{POST_ANALYSIS_FIELD_PREFIX}_severe_toxicity"
+    end
+  end
+
   def self.backfill_post_etiquette_check(post)
     response = self.request_analyze_comment(post)
-    post.custom_fields[POST_ANALYSIS_FIELD] = MultiJson.dump(MultiJson.load(response.body))
-    post.custom_fields[POST_ANALYSIS_DATATIME_FIELD] = DateTime.now
+    score = self.extract_value_from_analyze_comment_response(response.body)
+    post.custom_fields[self.post_score_field_name] = score[:score]
     post.save_custom_fields(true)
   end
 
